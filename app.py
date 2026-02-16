@@ -15,93 +15,87 @@ def coach_parle(texte):
         </script>
     """, height=0)
 
-# --- 2. CONFIGURATION & STYLE ---
-st.set_page_config(page_title="MON COACH ELITE - 90KG", layout="wide")
-st.markdown("""
-    <style>
-    .motivation-box {
-        font-size: 20px; font-weight: bold; color: #FFFFFF;
-        text-align: center; padding: 15px; border-radius: 10px;
-        background: linear-gradient(90deg, #FF4B2B 0%, #FF416C 100%);
-        margin-bottom: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# --- 2. CONFIGURATION ---
+st.set_page_config(page_title="MON COACH ELITE", layout="wide")
 
-# --- 3. LOGIQUE DATE & MOTIVATION ---
-d_view = st.date_input("📅 Date de l'entraînement :", datetime.now())
-st.markdown('<div class="motivation-box">Lâche rien ! Objectif 90kg. La discipline bat la motivation.</div>', unsafe_allow_html=True)
+# --- 3. PROGRAMME HYBRIDE AVEC RPE ---
+if 'exo_index' not in st.session_state:
+    st.session_state.exo_index = 0
+    st.session_state.training_active = False
 
-# --- 4. PROGRAMME DES 12 MOIS ---
-# On définit ici tes exercices du lundi 16 février
-exos_lundi = [
-    {"nom": "Goblet Squat (25kg)", "duree": 45, "rpe": "7", "consigne": "Dos droit, descends bien bas."},
-    {"nom": "Repos", "duree": 60, "rpe": "-", "consigne": "Respire, bois une gorgée d'eau."},
-    {"nom": "Fentes avant (10kg)", "duree": 40, "rpe": "7-8", "consigne": "Contrôle la descente."},
-    {"nom": "Repos", "duree": 60, "rpe": "-", "consigne": "Prépare-toi pour la planche."},
-    {"nom": "Planche (Gainage)", "duree": 60, "rpe": "8", "consigne": "Aspire le nombril."},
-    {"nom": "Repos", "duree": 30, "rpe": "-", "consigne": "Dernier effort latéral."},
-    {"nom": "Gainage latéral", "duree": 45, "rpe": "8", "consigne": "Hanches bien hautes."}
+# RPE cible pour demain : 7-8 (Phase Adaptation)
+programme = [
+    {"nom": "Goblet Squat (25kg)", "type": "reps", "valeur": "12 répétitions", "rpe": "7-8", "consigne": "Dos droit, contrôle la descente."},
+    {"nom": "Repos", "type": "chrono", "valeur": 60, "rpe": "-", "consigne": "Respire, bois un peu d'eau."},
+    {"nom": "Fentes avant (10kg)", "type": "reps", "valeur": "10 répétitions par jambe", "rpe": "7-8", "consigne": "Garde l'équilibre, ne touche pas le sol trop fort."},
+    {"nom": "Repos", "type": "chrono", "valeur": 60, "rpe": "-", "consigne": "Prépare-toi pour le gainage."},
+    {"nom": "Planche (Gainage)", "type": "chrono", "valeur": 60, "rpe": "8", "consigne": "Aspire le nombril, fessiers serrés."},
+    {"nom": "Repos", "type": "chrono", "valeur": 30, "rpe": "-", "consigne": "Dernier effort sur le côté."},
+    {"nom": "Gainage latéral", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Hanches bien hautes."}
 ]
 
-tabs = st.tabs(["🏋️ Séance du Jour", "🍎 Nutrition & Jeûne", "📊 Suivi Poids", "📅 Plan 12 Mois"])
+st.title("🏋️‍♂️ Coaching Intelligent & RPE")
 
-# --- TAB 1 : LE COACH VOCAL ---
+tabs = st.tabs(["🚀 Séance", "🍎 Nutrition", "📉 Poids"])
+
 with tabs[0]:
-    st.header("🏁 Ton Coaching Vocal")
-    if st.button("▶️ DÉMARRER LA SÉANCE"):
-        coach_parle("C'est parti Champion ! On vise les 90 kilos. Premier exercice : Goblet Squats.")
-        
-        for exo in exos_lundi:
-            nom = exo["nom"]
-            duree = exo["duree"]
-            consigne = exo["consigne"]
+    if not st.session_state.training_active:
+        st.info("💡 Rappel RPE 7-8 : Tu dois finir la série en sentant que tu pourrais encore en faire 2 ou 3.")
+        if st.button("🏁 DÉMARRER LA SÉANCE"):
+            st.session_state.training_active = True
+            st.session_state.exo_index = 0
+            st.rerun()
+    else:
+        index = st.session_state.exo_index
+        if index < len(programme):
+            exo = programme[index]
+            
+            # Affichage en-tête
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.subheader(f"📍 {exo['nom']}")
+            with col2:
+                if exo['rpe'] != "-":
+                    st.warning(f"🎯 RPE : {exo['rpe']}")
 
-            st.subheader(f"📍 En cours : {nom}")
-            if nom != "Repos":
-                coach_parle(f"{nom}. {consigne}")
-            else:
-                coach_parle("Repos. Détends-toi.")
+            st.write(f"👉 *{exo['consigne']}*")
 
-            ph = st.empty()
-            for s in range(duree, -1, -1):
-                ph.metric(label=f"Chrono : {nom}", value=f"{s}s")
-                if s == 10 and nom != "Repos": coach_parle("Encore 10 secondes !")
-                if s == 3: coach_parle("3. 2. 1.")
-                time.sleep(1)
-            ph.empty()
-            st.success(f"✅ {nom} validé")
+            # --- CAS 1 : RÉPÉTITIONS ---
+            if exo['type'] == "reps":
+                st.header(f"🔢 {exo['valeur']}")
+                if 'last_announced' not in st.session_state or st.session_state.last_announced != exo['nom']:
+                    # Le coach annonce l'exercice ET le RPE attendu
+                    coach_parle(f"{exo['nom']}. Objectif {exo['valeur']}. Intensité R.P.E. {exo['rpe']}. {exo['consigne']}")
+                    st.session_state.last_announced = exo['nom']
+                
+                if st.button("✅ Série terminée"):
+                    st.session_state.exo_index += 1
+                    st.rerun()
 
-        coach_parle("Séance terminée ! Fier de toi. N'oublie pas tes 220 grammes de protéines.")
-        st.balloons()
+            # --- CAS 2 : CHRONO ---
+            elif exo['type'] == "chrono":
+                st.header(f"⏳ {exo['valeur']} secondes")
+                if 'last_announced' not in st.session_state or st.session_state.last_announced != exo['nom']:
+                    phrase_rpe = f"Intensité R.P.E. {exo['rpe']}" if exo['rpe'] != "-" else ""
+                    coach_parle(f"{exo['nom']} pendant {exo['valeur']} secondes. {phrase_rpe}")
+                    st.session_state.last_announced = exo['nom']
 
-# --- TAB 2 : NUTRITION (220g Prot / Jeûne) ---
+                ph = st.empty()
+                if st.button("▶️ Lancer le chrono"):
+                    for s in range(exo['valeur'], -1, -1):
+                        ph.metric("Temps restant", f"{s}s")
+                        if s == 10: coach_parle("Encore 10 secondes !")
+                        if s == 3: coach_parle("3. 2. 1. Terminé.")
+                        time.sleep(1)
+                    st.session_state.exo_index += 1
+                    st.rerun()
+        else:
+            st.success("🏆 Séance terminée ! Beau boulot.")
+            coach_parle("Séance terminée. Bravo pour ton intensité. N'oublie pas de noter ton poids et tes protéines.")
+            if st.button("🔄 Recommencer"):
+                st.session_state.training_active = False
+                st.rerun()
+
 with tabs[1]:
-    st.header("🥗 Stratégie Nutritionnelle")
-    st.warning("⚠️ Rappel : 220g de Protéines par jour")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**Fenêtre Jeûne 16/8 :**")
-        st.write("- 12h00 : Gros repas (Poulet/Légumes)")
-        st.write("- 16h00 : Collation (Skyr + Whey)")
-        st.write("- 19h30 : Repas Léger (Poisson/Oeufs)")
-    with col2:
-        st.checkbox("✅ Poulet/Poisson préparé")
-        st.checkbox("✅ 3L d'eau bus")
-        st.checkbox("✅ Skyr/Whey consommé")
-
-# --- TAB 3 : SUIVI POIDS ---
-with tabs[2]:
-    st.header("📉 Objectif 111kg -> 90kg")
-    poids = st.number_input("Poids du jour (kg)", 70.0, 150.0, 111.0)
-    if st.button("Enregistrer le poids"):
-        st.success(f"Poids de {poids}kg enregistré !")
-
-# --- TAB 4 : PLAN 12 MOIS ---
-with tabs[3]:
-    st.header("🗓️ Ta Progression")
-    st.table({
-        "Mois": ["1-2", "3-5", "6-9", "10-12"],
-        "Phase": ["Adaptation", "Force", "Volume", "Finition"],
-        "RPE Cible": ["7-8", "8-9", "9", "9-10"]
-    })
+    st.write("Objectif : 220g Protéines / Jeûne 16/8")
+    st.write("Repas du soir : LÉGER (Poisson/Oeufs)")
