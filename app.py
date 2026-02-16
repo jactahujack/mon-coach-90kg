@@ -1,71 +1,119 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
+import time
 
-st.set_page_config(page_title="Objectif 90kg", layout="wide")
+st.set_page_config(page_title="Coach Élite - 90kg", layout="wide", initial_sidebar_state="expanded")
 
-# --- GESTION DE LA BASE DE DONNÉES (FICHIER EXCEL) ---
+# --- BASE DE DONNÉES ---
 DB_FILE = "suivi_sport.csv"
-
 def charger_donnees():
-    if os.path.exists(DB_FILE):
-        return pd.read_csv(DB_FILE)
-    else:
-        return pd.DataFrame(columns=["Date", "Poids", "Taille", "Notes", "Statut"])
+    if os.path.exists(DB_FILE): return pd.read_csv(DB_FILE)
+    return pd.DataFrame(columns=["Date", "Poids", "Notes"])
 
-def sauvegarder_donnee(poids, taille, notes):
-    df = charger_donnees()
-    nouvelle_ligne = {
-        "Date": str(date.today()),
-        "Poids": poids,
-        "Taille": taille,
-        "Notes": notes,
-        "Statut": "Validé ✅"
-    }
-    df = pd.concat([df, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-    df.to_csv(DB_FILE, index=False)
+# --- STYLE ---
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7f9; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- LOGIQUE DES 12 MOIS ---
+def obtenir_phase(d):
+    # Liste des dates de début de chaque mois (tous les 16 du mois)
+    dates_debut = [date(2026, 2, 16) + timedelta(days=30*i) for i in range(12)]
+    
+    if d < dates_debut[0]:
+        return "Préparation", "Repos & Mobilité", "Équilibre", "Prêt pour le 16 février ?"
+    
+    # Détermination du mois actuel (1 à 12)
+    m = 1
+    for i, start_date in enumerate(dates_debut):
+        if d >= start_date:
+            m = i + 1
+    
+    # Définition des cycles
+    if m <= 3:
+        titre = f"🔥 PHASE 1 : FONDATIONS (Mois {m}/12)"
+        exos = {
+            "Monday": ["Renforcement A", "Goblet Squat 3x12, Fentes 3x8, Planche 60s", "220g Protéines"],
+            "Wednesday": ["Renforcement B", "Pompes 4x8, Rowing 4x10, Gainage 45s", "220g Protéines"],
+            "Friday": ["Cardio Base", "Marche active 40min ou 6x2' rapide", "180g Protéines"]
+        }
+    elif m <= 6:
+        titre = f"⚡ PHASE 2 : PUISSANCE (Mois {m}/12)"
+        exos = {
+            "Monday": ["Force Bas", "Squat Lourd 4x8, Fentes Bulgares 3x10, Planche 90s", "230g Protéines"],
+            "Wednesday": ["Force Haut", "Pompes Diamant 4x10, Rowing Lourd 4x8, Dips 3x12", "230g Protéines"],
+            "Friday": ["HIIT", "8x1' sprint / 1' repos", "200g Protéines"]
+        }
+    elif m <= 9:
+        titre = f"💪 PHASE 3 : HYPERTROPHIE (Mois {m}/12)"
+        exos = {
+            "Monday": ["Volume Bas", "Squat 4x12, Soulevé de terre partiel 4x10, Planche lestée", "240g Protéines"],
+            "Wednesday": ["Volume Haut", "Pompes Large 4x15, Tractions 4xMAX, Dips 4x12", "240g Protéines"],
+            "Friday": ["Endurance Dynamique", "Course 45min ou Corde à sauter", "210g Protéines"]
+        }
+    else:
+        titre = f"⚔️ PHASE 4 : DÉFINITION FINALE (Mois {m}/12)"
+        exos = {
+            "Monday": ["Circuit Brûle-Gras", "Squat-Pompes-Burpees (4 tours)", "220g Protéines (Low Carb)"],
+            "Wednesday": ["Densité Musculaire", "Séries combinées Haut/Bas, Gainage total", "220g Protéines (Low Carb)"],
+            "Friday": ["Cardio HIIT Final", "10x30'' Sprint / 30'' Repos", "180g Protéines (Low Carb)"]
+        }
+
+    jour = d.strftime('%A')
+    p_jour = exos.get(jour, ["Repos Récupération", "Marche 30min & Étirements", "Protéines stables"])
+    return titre, p_jour[0], p_jour[1], p_jour[2]
 
 # --- INTERFACE ---
-st.title("🔥 Mon Coach Elite : Objectif 90kg")
-
 with st.sidebar:
-    st.header("⚖️ Ma Pesée")
-    p_saisi = st.number_input("Poids actuel (kg)", 80.0, 150.0, 105.0, step=0.1)
-    t_saisi = st.number_input("Tour de taille (cm)", 70, 130, 100)
-    notes_jour = st.text_area("Notes (énergie, ressentis...)")
-    
-    if st.button("Enregistrer ma journée"):
-        sauvegarder_donnee(p_saisi, t_saisi, notes_jour)
-        st.success("Données enregistrées !")
+    st.header("📊 Suivi Quotidien")
+    poids_saisi = st.number_input("Poids (kg)", 70.0, 150.0, 111.0)
+    notes_saisies = st.text_area("Notes")
+    if st.button("Valider la journée"):
+        df = charger_donnees()
+        nl = {"Date": str(date.today()), "Poids": poids_saisi, "Notes": notes_saisies}
+        pd.concat([df, pd.DataFrame([nl])]).to_csv(DB_FILE, index=False)
+        st.success("C'est noté !")
         st.balloons()
 
-# --- PROGRAMME DU JOUR ---
-date_focus = st.date_input("Consulter le programme du :", date(2026, 2, 16))
+st.title("🛡️ Programme Élite : Objectif 90kg")
 
-# (Ici la logique du programme reste la même que précédemment...)
-prog = {
-    "Monday": ["Renforcement", "Goblet squat 3×12 (25kg), Fentes 3×8, Planche 60s", "220g Prot / 180g Féculents"],
-    "Tuesday": ["Marche Fractionnée", "6×2′ rapide / 2′ lente - RPE 8", "180-200g Prot / 100-120g Féculents"],
-    "Wednesday": ["Renforcement", "Pompes lestées 4×6, Rowing 4×6 (20kg)", "220g Prot / 180g Féculents"],
-    "Thursday": ["Marche Modérée", "5 km - Rythme régulier", "180-200g Prot / 100-120g Féculents"],
-    "Friday": ["Marche Fractionnée", "6×2′ rapide / 2′ lente", "180-200g Prot / 100-120g Féculents"],
-    "Saturday": ["Core & Mobilité", "Planche 60s, Hollow hold 30s", "220g Prot / 180g Féculents"],
-    "Sunday": ["Repos Actif", "Étirements + marche 3km", "180-200g Prot / 100-120g Féculents"]
-}
+t1, t2, t3, t4 = st.tabs(["🏋️ Séance", "⏱️ Chrono", "🛒 Liste de Courses", "📈 Historique"])
 
-jour_semaine = date_focus.strftime('%A')
-if date(2026, 2, 16) <= date_focus <= date(2026, 3, 15):
-    infos = prog.get(jour_semaine)
+with t1:
+    d_view = st.date_input("Afficher le programme du :", date.today())
+    phase_titre, s_nom, s_detail, s_nutri = obtenir_phase(d_view)
+    st.subheader(phase_titre)
     col1, col2 = st.columns(2)
-    with col1: st.info(f"🏋️ **{infos[0]}**\n\n{infos[1]}")
-    with col2: st.warning(f"🍎 **Nutrition**\n\n{infos[2]}")
+    with col1:
+        st.info(f"**{s_nom}**\n\n{s_detail}")
+    with col2:
+        st.warning(f"**Nutrition**\n\n{s_nutri}")
 
-# --- HISTORIQUE ---
-st.divider()
-st.subheader("📈 Mon Historique")
-donnees = charger_donnees()
-if not donnees.empty:
-    st.dataframe(donnees.tail(7)) # Affiche les 7 derniers jours
-else:
-    st.write("Aucune donnée enregistrée pour le moment.")
+with t2:
+    st.subheader("⏱️ Minuteur Planche / Repos")
+    sec = st.slider("Secondes", 30, 180, 60)
+    if st.button("Lancer"):
+        progress_bar = st.progress(0)
+        for i in range(sec):
+            time.sleep(1)
+            progress_bar.progress((i + 1) / sec)
+        st.success("Terminé !")
+
+with t3:
+    st.subheader("🛒 Indispensables")
+    cols = st.columns(3)
+    with cols[0]: st.write("**Protéines**\n- Poulet\n- Œufs\n- Poisson\n- Fromage Blanc")
+    with cols[1]: st.write("**Glucides**\n- Riz\n- Quinoa\n- Flocons d'avoine\n- Patates douces")
+    with cols[2]: st.write("**Autres**\n- Brocolis\n- Épinards\n- Avocat\n- Amandes")
+
+with t4:
+    st.subheader("📉 Ta progression")
+    donnees = charger_donnees()
+    if not donnees.empty:
+        st.line_chart(donnees.set_index("Date")["Poids"])
+        st.write(donnees.tail(5))
