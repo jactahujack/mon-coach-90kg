@@ -124,3 +124,4 @@ with tabs[3]:
     st.header("📈 Poids")
     st.number_input("Poids (kg)", 70.0, 150.0, 111.0)
     st.button("Enregistrer")
+
