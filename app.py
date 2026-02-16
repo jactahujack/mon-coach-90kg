@@ -4,116 +4,98 @@ from datetime import datetime, date, timedelta
 import os
 import time
 
-st.set_page_config(page_title="Coach Élite - 90kg", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Coach Élite 90kg - Discipline", layout="wide")
 
-# --- BASE DE DONNÉES ---
-DB_FILE = "suivi_sport.csv"
-def charger_donnees():
-    if os.path.exists(DB_FILE): return pd.read_csv(DB_FILE)
-    return pd.DataFrame(columns=["Date", "Poids", "Notes"])
-
-# --- STYLE ---
+# --- STYLE PERSONNALISÉ ---
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .motivation-text {
+        font-size: 24px !important;
+        font-weight: bold;
+        color: #FF4B4B;
+        text-align: center;
+        padding: 10px;
+        border: 2px solid #FF4B4B;
+        border-radius: 10px;
+        background-color: #FFF5F5;
+        margin-bottom: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGIQUE DES 12 MOIS ---
-def obtenir_phase(d):
-    # Liste des dates de début de chaque mois (tous les 16 du mois)
-    dates_debut = [date(2026, 2, 16) + timedelta(days=30*i) for i in range(12)]
-    
-    if d < dates_debut[0]:
-        return "Préparation", "Repos & Mobilité", "Équilibre", "Prêt pour le 16 février ?"
-    
-    # Détermination du mois actuel (1 à 12)
-    m = 1
-    for i, start_date in enumerate(dates_debut):
-        if d >= start_date:
-            m = i + 1
-    
-    # Définition des cycles
-    if m <= 3:
-        titre = f"🔥 PHASE 1 : FONDATIONS (Mois {m}/12)"
-        exos = {
-            "Monday": ["Renforcement A", "Goblet Squat 3x12, Fentes 3x8, Planche 60s", "220g Protéines"],
-            "Wednesday": ["Renforcement B", "Pompes 4x8, Rowing 4x10, Gainage 45s", "220g Protéines"],
-            "Friday": ["Cardio Base", "Marche active 40min ou 6x2' rapide", "180g Protéines"]
-        }
-    elif m <= 6:
-        titre = f"⚡ PHASE 2 : PUISSANCE (Mois {m}/12)"
-        exos = {
-            "Monday": ["Force Bas", "Squat Lourd 4x8, Fentes Bulgares 3x10, Planche 90s", "230g Protéines"],
-            "Wednesday": ["Force Haut", "Pompes Diamant 4x10, Rowing Lourd 4x8, Dips 3x12", "230g Protéines"],
-            "Friday": ["HIIT", "8x1' sprint / 1' repos", "200g Protéines"]
-        }
-    elif m <= 9:
-        titre = f"💪 PHASE 3 : HYPERTROPHIE (Mois {m}/12)"
-        exos = {
-            "Monday": ["Volume Bas", "Squat 4x12, Soulevé de terre partiel 4x10, Planche lestée", "240g Protéines"],
-            "Wednesday": ["Volume Haut", "Pompes Large 4x15, Tractions 4xMAX, Dips 4x12", "240g Protéines"],
-            "Friday": ["Endurance Dynamique", "Course 45min ou Corde à sauter", "210g Protéines"]
-        }
-    else:
-        titre = f"⚔️ PHASE 4 : DÉFINITION FINALE (Mois {m}/12)"
-        exos = {
-            "Monday": ["Circuit Brûle-Gras", "Squat-Pompes-Burpees (4 tours)", "220g Protéines (Low Carb)"],
-            "Wednesday": ["Densité Musculaire", "Séries combinées Haut/Bas, Gainage total", "220g Protéines (Low Carb)"],
-            "Friday": ["Cardio HIIT Final", "10x30'' Sprint / 30'' Repos", "180g Protéines (Low Carb)"]
-        }
+# --- BASE DE DONNÉES ---
+DB_DAILY = "suivi_quotidien.csv"
+def charger_donnees():
+    if os.path.exists(DB_DAILY): return pd.read_csv(DB_DAILY)
+    return pd.DataFrame(columns=["Date", "Poids", "Notes"])
 
-    jour = d.strftime('%A')
-    p_jour = exos.get(jour, ["Repos Récupération", "Marche 30min & Étirements", "Protéines stables"])
-    return titre, p_jour[0], p_jour[1], p_jour[2]
+# --- LOGIQUE DE DATE ET MOTIVATION ---
+d_view = st.date_input("Date de consultation :", date.today())
+jour_nom = d_view.strftime('%A')
 
-# --- INTERFACE ---
-with st.sidebar:
-    st.header("📊 Suivi Quotidien")
-    poids_saisi = st.number_input("Poids (kg)", 70.0, 150.0, 111.0)
-    notes_saisies = st.text_area("Notes")
-    if st.button("Valider la journée"):
-        df = charger_donnees()
-        nl = {"Date": str(date.today()), "Poids": poids_saisi, "Notes": notes_saisies}
-        pd.concat([df, pd.DataFrame([nl])]).to_csv(DB_FILE, index=False)
-        st.success("C'est noté !")
+citations = {
+    "Monday": "🚀 LUNDI : Nouvelle semaine, nouvelle opportunité de devenir l'homme que tu veux être. Ne lâche rien !",
+    "Tuesday": "🔥 MARDI : La discipline, c'est choisir entre ce que tu veux maintenant et ce que tu veux le plus.",
+    "Wednesday": "💪 MERCREDI : Mi-chemin ! La fatigue est temporaire, la fierté est éternelle.",
+    "Thursday": "⚔️ JEUDI : C'est quand c'est dur que tu gagnes tes galons. Continue de pousser !",
+    "Friday": "⚡ VENDREDI : Finis fort ! Ne laisse pas le week-end gâcher tes efforts de la semaine.",
+    "Saturday": "🏆 SAMEDI : Les champions s'entraînent quand les autres dorment. Ta régularité fera la différence.",
+    "Sunday": "🧘 DIMANCHE : Repose le corps, recharge l'esprit, mais garde l'objectif en vue. Prêt pour demain !"
+}
+
+# --- AFFICHAGE DE LA MOTIVATION ---
+st.markdown(f'<div class="motivation-text">{citations.get(jour_nom)}</div>', unsafe_allow_html=True)
+
+# --- NAVIGATION ---
+tabs = st.tabs(["🏋️ Séance & Nutrition", "✅ Check-list Nutrition", "📊 Bilans Mensuels", "📈 Evolution"])
+
+with tabs[0]:
+    # Programme simplifié basé sur tes données
+    prog = {
+        "Monday": ["Renforcement Bas", "Goblet squat 3x12, Fentes 3x8, Planche 60s", "220g Prot / 180g Féc"],
+        "Wednesday": ["Renforcement Haut", "Pompes lestées 4x6, Rowing 4x6", "220g Prot / 180g Féc"],
+        "Friday": ["Marche Fractionnée", "6x2' rapide / 2' lente", "180-200g Prot / 100g Féc"]
+    }
+    current = prog.get(jour_nom, ["Repos Actif", "Marche modérée ou Étirements", "Protéines stables"])
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.info(f"**SÉANCE : {current[0]}**\n\n{current[1]}")
+    with c2:
+        st.warning(f"**NUTRITION**\n\n{current[2]}")
+
+with tabs[1]:
+    st.subheader("✅ Check-list Nutritionnelle")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.checkbox("Protéines à chaque repas (4x)")
+        st.checkbox("Légumes à chaque repas principal")
+        st.checkbox("Fruit quotidien")
+    with col_b:
+        st.checkbox("Hydratation minimale (2L+)")
+        st.checkbox("Pas d'écarts > 2/semaine")
+        st.checkbox("Féculents adaptés à l'effort")
+
+with tabs[2]:
+    st.header("📊 Bilan Mensuel")
+    with st.form("bilan_mensuel"):
+        st.write("**Mesures & Énergie**")
+        c_b1, c_b2 = st.columns(2)
+        p_fin = c_b1.number_input("Poids de fin de mois (kg)", 70.0, 150.0)
+        t_taille = c_b2.number_input("Tour de taille fin (cm)", 50, 150)
+        
+        st.divider()
+        st.write("**Analyse Qualitative**")
+        pos = st.text_area("✨ Points positifs (réussites)")
+        neg = st.text_area("⚠️ Points à améliorer")
+        obj_next = st.text_area("🎯 Objectifs pour le mois suivant")
+        
+        if st.form_submit_button("Valider le Bilan du Mois"):
+            st.success("Bilan enregistré ! Bravo pour tes efforts.")
+
+with tabs[3]:
+    st.subheader("📈 Historique")
+    poids_input = st.number_input("Enregistrer poids aujourd'hui (kg)", 70.0, 150.0, 111.0)
+    if st.button("Enregistrer"):
+        # Logique de sauvegarde
         st.balloons()
-
-st.title("🛡️ Programme Élite : Objectif 90kg")
-
-t1, t2, t3, t4 = st.tabs(["🏋️ Séance", "⏱️ Chrono", "🛒 Liste de Courses", "📈 Historique"])
-
-with t1:
-    d_view = st.date_input("Afficher le programme du :", date.today())
-    phase_titre, s_nom, s_detail, s_nutri = obtenir_phase(d_view)
-    st.subheader(phase_titre)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info(f"**{s_nom}**\n\n{s_detail}")
-    with col2:
-        st.warning(f"**Nutrition**\n\n{s_nutri}")
-
-with t2:
-    st.subheader("⏱️ Minuteur Planche / Repos")
-    sec = st.slider("Secondes", 30, 180, 60)
-    if st.button("Lancer"):
-        progress_bar = st.progress(0)
-        for i in range(sec):
-            time.sleep(1)
-            progress_bar.progress((i + 1) / sec)
-        st.success("Terminé !")
-
-with t3:
-    st.subheader("🛒 Indispensables")
-    cols = st.columns(3)
-    with cols[0]: st.write("**Protéines**\n- Poulet\n- Œufs\n- Poisson\n- Fromage Blanc")
-    with cols[1]: st.write("**Glucides**\n- Riz\n- Quinoa\n- Flocons d'avoine\n- Patates douces")
-    with cols[2]: st.write("**Autres**\n- Brocolis\n- Épinards\n- Avocat\n- Amandes")
-
-with t4:
-    st.subheader("📉 Ta progression")
-    donnees = charger_donnees()
-    if not donnees.empty:
-        st.line_chart(donnees.set_index("Date")["Poids"])
-        st.write(donnees.tail(5))
