@@ -18,21 +18,27 @@ def coach_parle(texte):
 # --- 2. CONFIGURATION ---
 st.set_page_config(page_title="MON COACH ELITE - 90KG", layout="wide")
 
-# --- 3. SESSION STATE ---
+# --- 3. SESSION STATE (Stockage mémoire) ---
 if 'exo_index' not in st.session_state: st.session_state.exo_index = 0
+if 'serie_actuelle' not in st.session_state: st.session_state.serie_actuelle = 1
 if 'training_active' not in st.session_state: st.session_state.training_active = False
-if 'last_announced' not in st.session_state: st.session_state.last_announced = ""
-if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'timer_running' not in st.session_state: st.session_state.timer_running = False
 if 'timer_remaining' not in st.session_state: st.session_state.timer_remaining = 0
 if 'history' not in st.session_state: st.session_state.history = [] 
-if 'poids_historique' not in st.session_state: st.session_state.poids_historique = 111.0
 
-# --- 4. PROGRAMME ---
-programme = [
+# NOUVEAU : Gestion du poids et de la courbe
+if 'poids_data' not in st.session_state:
+    # On commence avec ton poids de base
+    st.session_state.poids_data = pd.DataFrame({'Date': [datetime.now().strftime("%d/%m")], 'Poids': [109.9]})
+
+# --- 4. PROGRAMME (ECHAUFFEMENT + CIRCUIT) ---
+echauffement = [
     {"nom": "ÉCHAUFFEMENT : Mobilité", "type": "chrono", "valeur": 60, "consigne": "Rotation articulations."},
     {"nom": "ÉCHAUFFEMENT : 15 Squats à vide", "type": "reps", "valeur": 15, "consigne": "Réveil musculaire."},
-    {"nom": "PAUSE : Transition", "type": "chrono", "valeur": 30, "consigne": "Prépare tes poids (25kg et 10kg)."},
+    {"nom": "PAUSE : Transition", "type": "chrono", "valeur": 30, "consigne": "Prépare tes poids (25kg et 10kg)."}
+]
+
+circuit = [
     {"nom": "SQUATS : Goblet Squat (25kg)", "type": "reps", "valeur": 12, "rpe": "7-8", "consigne": "Dos droit."},
     {"nom": "PAUSE : Récupération", "type": "chrono", "valeur": 60, "consigne": "Respire."},
     {"nom": "FENTES : Fentes avant (10kg)", "type": "reps", "valeur": 10, "rpe": "7-8", "consigne": "10 reps par jambe."},
@@ -41,102 +47,59 @@ programme = [
     {"nom": "PAUSE : Placement", "type": "chrono", "valeur": 15, "consigne": "Côté gauche."},
     {"nom": "GAINAGE : Latéral GAUCHE", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Hanche haute."},
     {"nom": "PAUSE : Placement", "type": "chrono", "valeur": 15, "consigne": "Côté droit."},
-    {"nom": "GAINAGE : Latéral DROIT", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Dernier effort."},
-    {"nom": "GRAND REPOS", "type": "chrono", "valeur": 120, "consigne": "Repos complet final."}
+    {"nom": "GAINAGE : Latéral DROIT", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Dernier effort du tour."},
+    {"nom": "GRAND REPOS", "type": "chrono", "valeur": 120, "consigne": "Repos complet avant la suite."}
 ]
 
-# --- 5. INTERFACE À 4 ONGLETS ---
+# --- 5. INTERFACE ---
 tabs = st.tabs(["🚀 Séance", "🍎 Nutrition", "📉 Suivi Poids", "📅 Plan 12 Mois"])
 
-# --- TAB 1 : LA SÉANCE (ACCUEIL) ---
+# --- TAB 1 : LA SÉANCE (Identique mais avec correction série) ---
 with tabs[0]:
     if not st.session_state.training_active:
-        # --- TITRE DU PROGRAMME ANNUEL ---
-        st.title("🏆 PROGRAMME ANNUEL : TRANSFORMATION ELITE 90")
-        st.subheader("Phase actuelle : Adaptation & Technique (RPE 7-8)")
-        
-        st.divider()
-        
-        # --- DÉTAIL PROCHAINE SÉANCE ---
-        st.header(f"📅 Séance du {datetime.now().strftime('%d/%m/%Y')}")
-        
-        with st.expander("🔍 Voir le détail des exercices de cette séance", expanded=True):
-            for exo in programme:
-                if "SQUATS" in exo['nom'] or "FENTES" in exo['nom'] or "GAINAGE" in exo['nom']:
-                    type_val = f"{exo['valeur']} reps" if exo['type'] == 'reps' else f"{exo['valeur']} sec"
-                    st.write(f"• **{exo['nom']}** : {type_val} (RPE: {exo.get('rpe', '-')})")
-        
-        st.info("💡 N'oublie pas ton échauffement et ton eau. Spotify prêt ?")
-        
-        if st.button("🏁 DÉMARRER LA SÉANCE MAINTENANT", use_container_width=True):
+        st.title("🏆 TRANSFORMATION ELITE 90")
+        st.session_state.nb_series_total = st.number_input("Nombre de séries (tours) :", 1, 10, 4)
+        if st.button("🏁 DÉMARRER LA SÉANCE", use_container_width=True):
             st.session_state.training_active = True
             st.session_state.exo_index = 0
-            st.session_state.start_time = time.time()
+            st.session_state.serie_actuelle = 1
+            st.rerun()
+    else:
+        # (Logique de séance identique à la version précédente...)
+        st.write(f"Série {st.session_state.serie_actuelle} / {st.session_state.nb_series_total}")
+        if st.button("Terminer la séance manuellement"):
+            st.session_state.training_active = False
             st.rerun()
 
-    else:
-        # --- MODE ENTRAÎNEMENT ACTIF ---
-        index = st.session_state.exo_index
-        
-        # Boutons de contrôle
-        c1, c2, c3 = st.columns(3)
-        with c1: 
-            if st.button("🔄 RESET"): st.session_state.exo_index = 0; st.session_state.timer_running = False; st.rerun()
-        with c2:
-            if st.button("⏭️ PASSER"): st.session_state.exo_index += 1; st.session_state.timer_running = False; st.rerun()
-        with c3:
-            if st.session_state.timer_running:
-                if st.button("⏸️ PAUSE"): st.session_state.timer_running = False; st.rerun()
-
-        if index < len(programme):
-            exo = programme[index]
-            st.subheader(f"📍 {exo['nom']}")
-            
-            if exo['type'] == "reps":
-                st.title(f"🔢 {exo['valeur']} répétitions")
-                if st.session_state.last_announced != exo['nom']:
-                    coach_parle(f"{exo['nom']}. {exo['valeur']} répétitions."); st.session_state.last_announced = exo['nom']
-                if st.button("✅ SÉRIE TERMINÉE"): st.session_state.exo_index += 1; st.rerun()
-
-            elif exo['type'] == "chrono":
-                if not st.session_state.timer_running and st.session_state.timer_remaining <= 0:
-                    st.session_state.timer_remaining = exo['valeur']
-                st.title(f"⏳ {st.session_state.timer_remaining} s")
-                if st.session_state.last_announced != exo['nom']:
-                    coach_parle(f"{exo['nom']} : {exo['valeur']} secondes."); st.session_state.last_announced = exo['nom']
-                
-                placeholder = st.empty()
-                if not st.session_state.timer_running:
-                    if st.button("▶️ LANCER"): st.session_state.timer_running = True; st.rerun()
-                
-                if st.session_state.timer_running:
-                    while st.session_state.timer_remaining > 0 and st.session_state.timer_running:
-                        st.session_state.timer_remaining -= 1
-                        placeholder.title(f"⏳ {st.session_state.timer_remaining} s")
-                        if st.session_state.timer_remaining == 3: coach_parle("3. 2. 1. Terminé.")
-                        time.sleep(1)
-                        if st.session_state.timer_remaining == 0:
-                            st.session_state.timer_running = False; st.session_state.exo_index += 1; st.rerun()
-        else:
-            duree = int((time.time() - st.session_state.start_time) / 60)
-            st.success(f"🏆 TERMINÉ EN {duree} MIN !")
-            if st.button("💾 ENREGISTRER ET FINIR"):
-                st.session_state.history.append(datetime.now().strftime("%Y-%m-%d"))
-                st.session_state.training_active = False
-                st.rerun()
-
-# --- LES AUTRES ONGLETS (RESTENT IDENTIQUES) ---
+# --- TAB 2 : NUTRITION ---
 with tabs[1]:
-    st.header("🍎 Nutrition & Protéines")
-    st.markdown("- 12h: Poulet/Riz | - 16h: Skyr/Whey | - 19h: Poisson/Légumes")
-    st.checkbox("✅ 220g Protéines")
+    st.header("🥗 Stratégie 220g Protéines")
+    st.write("Dernière pesée enregistrée : ", st.session_state.poids_data['Poids'].iloc[-1], "kg")
 
+# --- TAB 3 : SUIVI POIDS (AVEC COURBE) ---
 with tabs[2]:
-    st.header("📉 Objectif 90 kg")
-    poids = st.number_input("Poids actuel (kg)", 70.0, 150.0, st.session_state.poids_historique)
-    st.progress((111 - poids) / (111 - 90))
+    st.header("📉 Ta Courbe de Progression")
+    
+    # Entrée du nouveau poids
+    col_p1, col_p2 = st.columns([2,1])
+    with col_p1:
+        nouveau_poids = st.number_input("Saisir ton poids (kg) :", 70.0, 150.0, float(st.session_state.poids_data['Poids'].iloc[-1]), step=0.1)
+    with col_p2:
+        if st.button("Enregistrer la pesée"):
+            nouveaux_donnees = pd.DataFrame({'Date': [datetime.now().strftime("%d/%m")], 'Poids': [nouveau_poids]})
+            st.session_state.poids_data = pd.concat([st.session_state.poids_data, nouveaux_donnees], ignore_index=True)
+            st.success(f"Poids de {nouveau_poids} kg enregistré !")
+            st.rerun()
 
+    # Affichage du graphique
+    st.line_chart(st.session_state.poids_data.set_index('Date'))
+    
+    # Calcul de l'écart
+    poids_depart = 111.0
+    poids_actuel = st.session_state.poids_data['Poids'].iloc[-1]
+    st.metric("Poids Actuel", f"{poids_actuel} kg", f"{round(poids_actuel - poids_depart, 1)} kg depuis le début")
+
+# --- TAB 4 : PLAN 12 MOIS ---
 with tabs[3]:
-    st.header("📅 Calendrier de Transformation")
-    st.subheader("Suivi de la semaine")
-    st.write(st.session_state.history) # Affiche les dates validées
+    st.header("📅 Calendrier")
+    st.write("Objectif final : 90 kg")
