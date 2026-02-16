@@ -10,7 +10,7 @@ def coach_parle(texte):
         <script>
             var msg = new SpeechSynthesisUtterance("{texte}");
             msg.lang = 'fr-FR';
-            msg.rate = 0.9;
+            msg.rate = 0.95;
             window.speechSynthesis.speak(msg);
         </script>
     """, height=0)
@@ -18,106 +18,123 @@ def coach_parle(texte):
 # --- 2. CONFIGURATION ---
 st.set_page_config(page_title="MON COACH ELITE - 90KG", layout="wide")
 
-# --- 3. GESTION DE LA SÉANCE & RESET ---
+# --- 3. SESSION STATE (Mémoire de l'app) ---
 if 'exo_index' not in st.session_state:
     st.session_state.exo_index = 0
 if 'training_active' not in st.session_state:
     st.session_state.training_active = False
 if 'last_announced' not in st.session_state:
     st.session_state.last_announced = ""
+if 'start_time' not in st.session_state:
+    st.session_state.start_time = None
+if 'timer_running' not in st.session_state:
+    st.session_state.timer_running = False
+if 'timer_remaining' not in st.session_state:
+    st.session_state.timer_remaining = 0
 
-# PROGRAMME : ECHAUFFEMENT + SEANCE
+# --- 4. PROGRAMME ---
 programme = [
-    {"nom": "ÉCHAUFFEMENT : Mobilité Articulaire", "type": "chrono", "valeur": 60, "rpe": "-", "consigne": "Rotation chevilles, genoux et hanches."},
-    {"nom": "ÉCHAUFFEMENT : 15 Squats à vide", "type": "reps", "valeur": "15 répétitions", "rpe": "3", "consigne": "Prépare tes articulations."},
-    {"nom": "ÉCHAUFFEMENT : Cardio léger", "type": "chrono", "valeur": 45, "rpe": "4", "consigne": "Marche active sur place."},
-    {"nom": "Repos de transition", "type": "chrono", "valeur": 30, "rpe": "-", "consigne": "Prends tes poids (25kg et 10kg)."},
-    {"nom": "Goblet Squat (25kg)", "type": "reps", "valeur": "12 répétitions", "rpe": "7-8", "consigne": "Dos droit, descends bien bas."},
-    {"nom": "Repos", "type": "chrono", "valeur": 60, "rpe": "-", "consigne": "Respire bien."},
-    {"nom": "Fentes avant (10kg)", "type": "reps", "valeur": "10 répétitions par jambe", "rpe": "7-8", "consigne": "Contrôle la descente."},
-    {"nom": "Repos", "type": "chrono", "valeur": 60, "rpe": "-", "consigne": "Prépare ton tapis."},
-    {"nom": "Planche (Gainage)", "type": "chrono", "valeur": 60, "rpe": "8", "consigne": "Gainage total, serre les fessiers."},
-    {"nom": "Repos", "type": "chrono", "valeur": 30, "rpe": "-", "consigne": "Dernier effort."},
-    {"nom": "Gainage latéral", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Hanches bien hautes."}
+    {"nom": "ÉCHAUFFEMENT : Mobilité", "type": "chrono", "valeur": 60, "consigne": "Rotation articulations."},
+    {"nom": "ÉCHAUFFEMENT : 15 Squats à vide", "type": "reps", "valeur": 15, "consigne": "Réveil musculaire."},
+    {"nom": "PAUSE : Transition", "type": "chrono", "valeur": 30, "consigne": "Prends tes poids (25kg et 10kg)."},
+    {"nom": "SQUATS : Goblet Squat (25kg)", "type": "reps", "valeur": 12, "rpe": "7-8", "consigne": "Contrôle la descente."},
+    {"nom": "PAUSE : Récupération", "type": "chrono", "valeur": 60, "consigne": "Respire."},
+    {"nom": "FENTES : Fentes avant (10kg)", "type": "reps", "valeur": 10, "rpe": "7-8", "consigne": "10 reps par jambe."},
+    {"nom": "PAUSE : Récupération", "type": "chrono", "valeur": 60, "consigne": "Prépare le tapis."},
+    {"nom": "GAINAGE : Planche", "type": "chrono", "valeur": 60, "rpe": "8", "consigne": "Abdos serrés."},
+    {"nom": "PAUSE : Placement", "type": "chrono", "valeur": 15, "consigne": "Côté gauche."},
+    {"nom": "GAINAGE : Latéral GAUCHE", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Hanche haute."},
+    {"nom": "PAUSE : Placement", "type": "chrono", "valeur": 15, "consigne": "Côté droit."},
+    {"nom": "GAINAGE : Latéral DROIT", "type": "chrono", "valeur": 45, "rpe": "8", "consigne": "Dernier effort."},
+    {"nom": "GRAND REPOS", "type": "chrono", "valeur": 120, "consigne": "Repos complet de fin de cycle."}
 ]
 
-# --- 4. INTERFACE ---
+# --- 5. INTERFACE ---
 tabs = st.tabs(["🚀 Séance", "🍎 Nutrition", "📉 Suivi Poids", "📅 Plan 12 Mois"])
 
-# --- TAB 1 : LA SÉANCE ---
 with tabs[0]:
-    # Bouton Reset toujours accessible si la séance est en cours
     if st.session_state.training_active:
-        if st.button("🔄 REPRENDRE AU DÉBUT (RESET)"):
-            st.session_state.exo_index = 0
-            st.session_state.last_announced = ""
-            st.rerun()
+        col_c1, col_c2, col_c3 = st.columns(3)
+        with col_c1:
+            if st.button("🔄 RESET"):
+                st.session_state.exo_index = 0
+                st.session_state.timer_running = False
+                st.rerun()
+        with col_c2:
+            if st.button("⏭️ PASSER"):
+                st.session_state.exo_index += 1
+                st.session_state.timer_running = False
+                st.rerun()
+        with col_c3:
+            if st.session_state.timer_running:
+                if st.button("⏸️ PAUSE"):
+                    st.session_state.timer_running = False
+                    st.rerun()
 
     if not st.session_state.training_active:
         st.header("Lundi 16 Février 2026")
-        st.info("🎯 Objectif RPE 7-8 | 220g Protéines")
         if st.button("🏁 DÉMARRER LA SÉANCE"):
             st.session_state.training_active = True
             st.session_state.exo_index = 0
+            st.session_state.start_time = time.time()
             st.rerun()
     else:
         index = st.session_state.exo_index
         if index < len(programme):
             exo = programme[index]
-            col1, col2 = st.columns([3, 1])
-            with col1: st.subheader(f"📍 {exo['nom']}")
-            with col2: 
-                if exo['rpe'] != "-": st.warning(f"🎯 RPE : {exo['rpe']}")
+            st.subheader(f"📍 {exo['nom']}")
             
-            st.write(f"👉 *{exo['consigne']}*")
-
             if exo['type'] == "reps":
-                st.header(f"🔢 {exo['valeur']}")
+                st.title(f"🔢 {exo['valeur']} répétitions")
                 if st.session_state.last_announced != exo['nom']:
-                    coach_parle(f"{exo['nom']}. {exo['valeur']}. R.P.E {exo['rpe']}.")
+                    coach_parle(f"{exo['nom']}. {exo['valeur']} répétitions.")
                     st.session_state.last_announced = exo['nom']
-                if st.button("✅ Série terminée"):
+                if st.button("✅ SÉRIE TERMINÉE"):
                     st.session_state.exo_index += 1
                     st.rerun()
 
             elif exo['type'] == "chrono":
-                st.header(f"⏳ {exo['valeur']} secondes")
+                # Initialisation du chrono local si pas encore lancé
+                if not st.session_state.timer_running and st.session_state.timer_remaining <= 0:
+                    st.session_state.timer_remaining = exo['valeur']
+                
+                st.title(f"⏳ {st.session_state.timer_remaining} s")
+                
                 if st.session_state.last_announced != exo['nom']:
-                    coach_parle(f"{exo['nom']} pendant {exo['valeur']} secondes.")
+                    coach_parle(f"{exo['nom']} : {exo['valeur']} secondes.")
                     st.session_state.last_announced = exo['nom']
-                ph = st.empty()
-                if st.button("▶️ Lancer le chrono"):
-                    for s in range(exo['valeur'], -1, -1):
-                        ph.metric("Temps restant", f"{s}s")
-                        if s == 3: coach_parle("3. 2. 1. Terminé.")
+
+                placeholder = st.empty()
+                
+                if not st.session_state.timer_running:
+                    if st.button("▶️ LANCER / REPRENDRE"):
+                        st.session_state.timer_running = True
+                        st.rerun()
+                
+                if st.session_state.timer_running:
+                    while st.session_state.timer_remaining > 0 and st.session_state.timer_running:
+                        st.session_state.timer_remaining -= 1
+                        placeholder.title(f"⏳ {st.session_state.timer_remaining} s")
+                        if st.session_state.timer_remaining == 3: coach_parle("3. 2. 1. Terminé.")
                         time.sleep(1)
-                    st.session_state.exo_index += 1
-                    st.rerun()
+                        if st.session_state.timer_remaining == 0:
+                            st.session_state.timer_running = False
+                            st.session_state.exo_index += 1
+                            st.rerun()
         else:
-            st.success("🏆 Bravo ! Séance finie.")
-            coach_parle("Séance terminée. Fier de toi champion.")
-            if st.button("🔄 Nouvelle séance"):
+            duree = int((time.time() - st.session_state.start_time) / 60)
+            st.success(f"🏆 TERMINÉ EN {duree} MIN !")
+            if st.button("🔄 FIN"):
                 st.session_state.training_active = False
                 st.rerun()
 
-# --- TAB 2 : NUTRITION ---
+# --- AUTRES ONGLETS (CONSERVÉS) ---
 with tabs[1]:
-    st.header("🥗 Stratégie 220g Protéines")
-    st.markdown("- 12h00 : Poulet/Riz\n- 16h30 : Collation Skyr/Whey\n- 19h30 : Poisson/Légumes")
-    st.checkbox("✅ 220g de Protéines")
-    st.checkbox("✅ 3L d'eau")
-
-# --- TAB 3 : SUIVI POIDS ---
+    st.header("🍎 Nutrition")
+    st.write("Objectif 220g Protéines. Fenêtre 16/8.")
 with tabs[2]:
-    st.header("📉 Objectif 90 kg")
+    st.header("📉 Poids")
     st.number_input("Poids (kg)", 70.0, 150.0, 111.0)
-    st.button("Enregistrer")
-
-# --- TAB 4 : PLAN 12 MOIS ---
 with tabs[3]:
-    st.header("🗓️ Calendrier prévisionnel")
-    dt = st.date_input("Voir le programme pour le :", datetime(2026, 11, 21))
-    if dt.month >= 10:
-        st.write("🔥 **Phase de Finition :** Circuit HIIT et Sèche finale.")
-    else:
-        st.write("💪 **Phase de Force :** Travail sur les charges.")
+    st.header("📅 Plan 12 Mois")
+    st.date_input("Date :", datetime(2026, 11, 21))
